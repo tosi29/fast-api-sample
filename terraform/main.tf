@@ -57,70 +57,72 @@ resource "aws_lambda_function" "api" {
   depends_on = [aws_iam_role_policy_attachment.lambda_basic_execution]
 }
 
-# API Gateway
-resource "aws_api_gateway_rest_api" "api" {
-  name        = "${var.project_name}-${var.environment}-api"
-  description = "FastAPI sample API"
+# API Gateway HTTP API
+resource "aws_apigatewayv2_api" "api" {
+  name          = "${var.project_name}-${var.environment}-api"
+  description   = "FastAPI sample API"
+  protocol_type = "HTTP"
 
-  endpoint_configuration {
-    types = ["REGIONAL"]
+  cors_configuration {
+    allow_credentials = false
+    allow_headers     = ["*"]
+    allow_methods     = ["*"]
+    allow_origins     = ["*"]
+    expose_headers    = []
+    max_age          = 0
   }
 }
 
-# API Gateway resource (catch all)
-resource "aws_api_gateway_resource" "proxy" {
-  rest_api_id = aws_api_gateway_rest_api.api.id
-  parent_id   = aws_api_gateway_rest_api.api.root_resource_id
-  path_part   = "{proxy+}"
-}
-
-# API Gateway method (ANY)
-resource "aws_api_gateway_method" "proxy" {
-  rest_api_id   = aws_api_gateway_rest_api.api.id
-  resource_id   = aws_api_gateway_resource.proxy.id
-  http_method   = "ANY"
-  authorization = "NONE"
-}
-
 # API Gateway integration
-resource "aws_api_gateway_integration" "lambda" {
-  rest_api_id = aws_api_gateway_rest_api.api.id
-  resource_id = aws_api_gateway_method.proxy.resource_id
-  http_method = aws_api_gateway_method.proxy.http_method
-
-  integration_http_method = "POST"
-  type                    = "AWS_PROXY"
-  uri                     = aws_lambda_function.api.invoke_arn
+resource "aws_apigatewayv2_integration" "lambda" {
+  api_id           = aws_apigatewayv2_api.api.id
+  integration_type = "AWS_PROXY"
+  integration_uri  = aws_lambda_function.api.invoke_arn
 }
 
-# API Gateway method for root path
-resource "aws_api_gateway_method" "proxy_root" {
-  rest_api_id   = aws_api_gateway_rest_api.api.id
-  resource_id   = aws_api_gateway_rest_api.api.root_resource_id
-  http_method   = "ANY"
-  authorization = "NONE"
+# API Gateway route (catch all)
+resource "aws_apigatewayv2_route" "proxy" {
+  api_id    = aws_apigatewayv2_api.api.id
+  route_key = "ANY /{proxy+}"
+  target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
 }
 
-# API Gateway integration for root path
-resource "aws_api_gateway_integration" "lambda_root" {
-  rest_api_id = aws_api_gateway_rest_api.api.id
-  resource_id = aws_api_gateway_method.proxy_root.resource_id
-  http_method = aws_api_gateway_method.proxy_root.http_method
-
-  integration_http_method = "POST"
-  type                    = "AWS_PROXY"
-  uri                     = aws_lambda_function.api.invoke_arn
+# API Gateway route for root path
+resource "aws_apigatewayv2_route" "proxy_root" {
+  api_id    = aws_apigatewayv2_api.api.id
+  route_key = "ANY /"
+  target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
 }
 
-# API Gateway deployment
-resource "aws_api_gateway_deployment" "api" {
-  depends_on = [
-    aws_api_gateway_integration.lambda,
-    aws_api_gateway_integration.lambda_root,
-  ]
+# API Gateway stage
+resource "aws_apigatewayv2_stage" "api" {
+  api_id      = aws_apigatewayv2_api.api.id
+  name        = var.environment
+  auto_deploy = true
 
-  rest_api_id = aws_api_gateway_rest_api.api.id
-  stage_name  = var.environment
+  access_log_settings {
+    destination_arn = aws_cloudwatch_log_group.api_gw.arn
+
+    format = jsonencode({
+      requestId      = "$context.requestId"
+      sourceIp       = "$context.identity.sourceIp"
+      requestTime    = "$context.requestTime"
+      protocol       = "$context.protocol"
+      httpMethod     = "$context.httpMethod"
+      resourcePath   = "$context.resourcePath"
+      routeKey       = "$context.routeKey"
+      status         = "$context.status"
+      responseLength = "$context.responseLength"
+      integrationErrorMessage = "$context.integrationErrorMessage"
+      }
+    )
+  }
+}
+
+# CloudWatch log group for API Gateway
+resource "aws_cloudwatch_log_group" "api_gw" {
+  name              = "/aws/apigateway/${var.project_name}-${var.environment}-api"
+  retention_in_days = 14
 }
 
 # Lambda permission for API Gateway
@@ -130,5 +132,5 @@ resource "aws_lambda_permission" "api_gw" {
   function_name = aws_lambda_function.api.function_name
   principal     = "apigateway.amazonaws.com"
 
-  source_arn = "${aws_api_gateway_rest_api.api.execution_arn}/*/*"
+  source_arn = "${aws_apigatewayv2_api.api.execution_arn}/*/*"
 }

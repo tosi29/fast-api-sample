@@ -1,6 +1,6 @@
 output "api_gateway_url" {
   description = "API Gateway URL"
-  value       = aws_api_gateway_deployment.api.invoke_url
+  value       = aws_apigatewayv2_stage.api.invoke_url
 }
 
 output "lambda_function_name" {
@@ -15,5 +15,5 @@ output "lambda_function_arn" {
 
 output "api_gateway_id" {
   description = "API Gateway ID"
-  value       = aws_api_gateway_rest_api.api.id
+  value       = aws_apigatewayv2_api.api.id
 }
