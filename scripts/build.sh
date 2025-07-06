@@ -19,7 +19,7 @@ echo "📦 Using temporary directory: $TEMP_DIR"
 
 # uvを使用して依存関係をインストール
 echo "📥 Installing dependencies with uv..."
-uv pip install --python 3.9 --target "$TEMP_DIR" -r <(uv pip compile pyproject.toml --quiet)
+uv pip install --python 3.9 --python-platform linux --target "$TEMP_DIR" -r <(uv pip compile pyproject.toml --quiet)
 
 # ソースコードをコピー
 echo "📄 Copying source code..."
