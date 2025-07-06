@@ -90,7 +90,26 @@ Configure in `terraform/variables.tf`:
 ## Development Notes
 
 - FastAPI app uses in-memory storage (not persistent)
-- Mangum adapter handles FastAPI to Lambda conversion
-- HTTP API Gateway provides simpler configuration than REST API
+- Mangum adapter handles FastAPI to Lambda conversion with `api_gateway_base_path="/dev"`
+- HTTP API Gateway v2.0 provides simpler configuration than REST API
 - Build script handles dependency packaging for Lambda deployment
 - All scripts include error handling and package size validation
+
+## Critical Implementation Details
+
+### Cross-platform Build Requirements
+- **MUST use `--python-platform linux`** in uv pip install for Lambda compatibility
+- macOS (arm64) → Linux (x86_64) binary compatibility issues with pydantic-core
+- Without this flag: `ImportModuleError: No module named 'pydantic_core._pydantic_core'`
+
+### HTTP API Gateway v2.0 Configuration  
+- **MUST set `api_gateway_base_path="/dev"`** in Mangum for correct routing
+- HTTP API v2.0 event format differs from REST API v1.0
+- Without this setting: All requests return 404 Not Found
+
+
+## Verified Deployment
+- ✅ All 4 API endpoints working on AWS Lambda
+- ✅ Cross-platform build (macOS → Linux) working
+- ✅ HTTP API Gateway v2.0 routing working
+- ✅ Complete end-to-end functionality verified

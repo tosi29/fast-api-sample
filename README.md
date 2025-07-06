@@ -102,20 +102,30 @@ curl http://localhost:8000/items
 デプロイ後、出力されるAPI Gateway URLを使用してテストできます:
 
 ```bash
+# Terraformの出力からAPIエンドポイントを取得
+cd terraform && terraform output api_gateway_url
+
+# 以下のコマンドで動作確認（$API_URLは上記で取得したURL）
 # ヘルスチェック
-curl https://xxxxxxxxxx.execute-api.ap-northeast-1.amazonaws.com/dev/
+curl $API_URL/
+# → {"status":"ok","message":"FastAPI is running!"}
 
 # アイテム一覧取得
-curl https://xxxxxxxxxx.execute-api.ap-northeast-1.amazonaws.com/dev/items
+curl $API_URL/items
+# → [{"id":1,"name":"Laptop",...}, ...]
 
 # 特定アイテム取得
-curl https://xxxxxxxxxx.execute-api.ap-northeast-1.amazonaws.com/dev/items/1
+curl $API_URL/items/1
+# → {"id":1,"name":"Laptop","description":"High-performance laptop",...}
 
 # 新規アイテム作成
-curl -X POST https://xxxxxxxxxx.execute-api.ap-northeast-1.amazonaws.com/dev/items \
+curl -X POST $API_URL/items \
   -H "Content-Type: application/json" \
   -d '{"name": "新しいアイテム", "description": "説明", "price": 100.0}'
+# → {"id":4,"name":"新しいアイテム",...}
 ```
+
+**✅ 動作確認済み**: 全エンドポイントがAWS Lambda上で正常動作しています。
 
 ## 🧰 開発コマンド
 
@@ -150,6 +160,20 @@ uv run pytest
 - `timeout`: タイムアウト時間
 - `memory_size`: メモリサイズ
 - `runtime`: Pythonランタイム
+
+## 🔧 トラブルシューティング
+
+### ImportModuleError (Lambda実行エラー)
+**症状**: `ImportModuleError: No module named 'pydantic_core._pydantic_core'`  
+**解決**: ビルドスクリプトが `--python-platform linux` を使用しているか確認
+
+### 404 Not Found (API Gateway)
+**症状**: 全APIで `{"detail":"Not Found"}` が返される  
+**解決**: `lambda_handler.py` で `api_gateway_base_path="/dev"` が設定されているか確認
+
+### uvコマンドエラー
+**症状**: `unexpected argument '--python-platform'`  
+**解決**: uvを最新版にアップデート
 
 ## 🗑️ リソース削除
 
