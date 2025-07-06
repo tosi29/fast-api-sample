@@ -138,4 +138,3 @@ Desktop.ini
 # Project specific
 dist/
 lambda.zip
-uv.lock
